@@ -15,11 +15,7 @@ double Vout = -1;
 
 
 void loop() {
-  while(true){
-    Serial.print("Vin: ");
-    Serial.println(measure_vin(),3);
-    delay(500);
-  }
+  serial_interface();
 }
   
 

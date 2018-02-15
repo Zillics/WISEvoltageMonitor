@@ -23,4 +23,10 @@ void logger_init(); //Initialize correct settings for hardware. Run this in setu
 
 double measure_vin(); //Estimate real voltage value of between input - and input +
 
+void serial_interface(); //Every function of the power monitor should be possible to perform through this Serial interface
+
+void test_function();
+
+void init_logging();
+
 #endif
