@@ -13,7 +13,6 @@ double Vin = -1;
 double Vout = -1;
 //Constants
 
-
 void loop() {
   serial_interface();
 }
