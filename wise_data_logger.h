@@ -8,8 +8,7 @@
 
 //INTERFACE SETTINGS 
 #define WAIT_TIME 100 //Define timeout for user input in seconds
-#define MAX_LENGTH 50 //maximum length of filename in letters
-
+#define MAX_LENGTH 50 //maximum length of filename used for logging
 
 //LCD pins
 extern int mosi_pin;
@@ -25,10 +24,12 @@ extern int pot_pin;
 //Measure pins
 extern int ain_pin;
 //Constants
-extern const double k; //voltage divider constant (hand calibrated)
+extern const double A; 
+extern const double B;
 //Logging parameters. TODO: Store in EEPROM
 extern int mem_logInterval;
 extern int mem_logTime;
+extern char mem_filename[MAX_LENGTH];
 extern File mem_logfile;
 
 
@@ -38,7 +39,12 @@ void logger_init(); //Initialize correct settings for hardware. Run this in setu
 
 double measure_vin(); //Estimate real voltage value of between input - and input +
 
+double measure_vin_n(int n); //Same as measure_vin(), but with mean of n samples to minimize noise
+
 double measure_vout(); //Measure voltage coming directly at ADC pin
+
+double measure_vout_n(int n); //Same as measure_vout(), but with mean of n samples to minimize noise
+
 
 //INTERFACE FUNCTIONS
 
@@ -46,9 +52,9 @@ void serial_interface(); //Every function of the power monitor should be possibl
 
 unsigned long ask_logging_params(); //Ask logging settings from user, store in EEPROM and return total number of measurements
 
-int askInt(char* str);
+int askInt(char* str); //In progress. Don't use....
 
-void ask_time();
+void ask_time(); //What time is it? Ask the user!
 
 int yes_or_not(); //Interface for verifying from user whether he wants to continue or not
 

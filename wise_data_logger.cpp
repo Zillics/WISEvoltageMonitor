@@ -1,7 +1,5 @@
 #include "wise_data_logger.h"
 
-
-
 /*
 //LCD pins
 int mosi_pin = 0;
@@ -13,10 +11,12 @@ int scl_pin = 32;
 //Measure pins
 int ain_pin = 14;
 //Constants
-const double k = 1.6468934199; //voltage divider constant (hand calibrated) TODO: Estimate properly (fit a line)
-
+//Calibrated values (using LS estimation) for estimating vin = vout*A + B 
+//NOTE:most optimal for values 3.3 V - 5 V 
+const double A = 1.65953740047; 
+const double B = -0.0291635521063; 
 //Values in memory TODO: implement this in a smart way (EEPROM??)
-char mem_filename[] = "";
+char mem_filename[MAX_LENGTH];
 int mem_logInterval;
 int mem_logTime;
 File mem_logfile;
@@ -37,7 +37,13 @@ void logger_init(){
 double measure_vin(){
 	int ain = analogRead(ain_pin);
 	double Vout = ((double)ain/8191.0)*3.3; //Convert from 13 bit -> real voltage value
-	double Vin = Vout*k; //After voltage divider
+	double Vin = Vout*A + B; //After voltage divider
+	return Vin;
+}
+//Same as measure_vin(), but with mean of n samples to minimize noise
+double measure_vin_n(int n){
+	double Vout = measure_vout_n(n);
+	double Vin = Vout*A + B;
 	return Vin;
 }
 
@@ -45,6 +51,15 @@ double measure_vout(){
 	int ain = analogRead(ain_pin);
 	double Vout = ((double)ain/8191.0)*3.3; //Convert from 13 bit -> real voltage value
 	return Vout;
+}
+//Same as measure_vout(), but with mean of n samples to minimize noise
+double measure_vout_n(int n){
+	double sum = 0;
+	for(int i = 0;i < n;i++){
+		sum += measure_vout();
+	}
+	double mean = sum/(double)n;
+	return mean;
 }
 
 //***********INTERFACE FUNCTIONS*************
@@ -134,7 +149,7 @@ unsigned long ask_logging_params(){
 
 	return n;
 }
-
+//What time is it? Ask the user!
 void ask_time(){
 	Serial.println(F("SETTING TIME"));
 	Serial.print(F("MONTH: "));
@@ -153,7 +168,7 @@ void ask_time(){
 	int year = 2018;
 	setTime(hour, minute,second, day, month, year);
 }
-
+//SUDDENLY STOPPED WORKING.... Don't use
 int askInt(char* str){
 	int input;
 	Serial.print(str);
@@ -162,7 +177,7 @@ int askInt(char* str){
 	Serial.flush();
 	return input; 
 }
-//SUDDENLY STOPPED WORKING....
+//SUDDENLY STOPPED WORKING....Don't use
 int yes_or_not(){
 	int usr_input = 0;
 	while(true){
@@ -184,7 +199,7 @@ int yes_or_not(){
 //***********LOGGING FUNCTIONS*************
 
 void init_logging(){
-	const int chipSelect = BUILTIN_SDCARD;
+	const int chipSelect = BUILTIN_SDCARD; //Select the built-in SD card for Teensy 3.5
 	Serial.print(F("Initializing SD card..."));
 	// see if the card is present and can be initialized:
 	if (!SD.begin(chipSelect)) {
@@ -196,7 +211,7 @@ void init_logging(){
 		unsigned long n = 0; //Total number of measurements. To be calculated after user input
 		//Start interface
 		Serial.println(F("***********Logging***************"));
-		n = ask_logging_params();
+		n = ask_logging_params(); //Get total number of measurements from user input
 		delay(100);
 		if(n > 0){
 			Serial.println(F("STARTING LOGGING....."));
@@ -222,56 +237,60 @@ void logging(int interval,unsigned long n){
 //Creates a string for the measuring status in the following form;
 //"[Number of measurement],[Date and time of measurement], [Measurement value in V]"
 void writeData(int i){
+	delay(100);
 	File logFile = SD.open(mem_filename, FILE_WRITE);//Open file. FILE_WRITE starts writing at end of file
+	delay(100);
 	if (!logFile) {
 		Serial.print(F("Error opening file"));
 		Serial.println(mem_filename);
 	}
-	//Initializing string starting with index i
-	//int ENOUGH = ((ceil(log10(i))+1)*sizeof(char));
-	int ENOUGH = 10;//Assuming index never exceeds 10 
-	char index[ENOUGH];
-	delay(10);
-	sprintf(index,"%d",i);
-	delay(50);
-	//Taking time and adding that to string
-	char h[3];
-	sprintf(h,"%d",hour());
-	char min[3];
-	sprintf(min,"%d",minute());
-	char s[3];
-	sprintf(s,"%d",second());
-	char d[3];
-	sprintf(d,"%d",day());
-	char mon[3];
-	sprintf(mon,"%d",month());
-	char y[5];
-	sprintf(y,"%d",year());
-	//Performing measurement and adding result to string
-	char v[6];
-	sprintf(v,"%0.3f",measure_vin());
-	//TODO:Writing string to logfile
-	char log_i[40];
-	strcpy(log_i,index);
-	strcat(log_i,",");
-	strcat(log_i,h);
-	strcat(log_i,":");
-	strcat(log_i,min);
-	strcat(log_i,":");
-	strcat(log_i,s);
-	strcat(log_i,", ");
-	strcat(log_i,d);
-	strcat(log_i,", ");
-	strcat(log_i,mon);
-	strcat(log_i,", ");
-	strcat(log_i,y);
-	strcat(log_i,", ");
-	strcat(log_i,v);
-	delay(10);
-	Serial.println(log_i);
-	delay(100);
-	logFile.println(log_i); //Write string + newline to logfile
-	delay(10);
-	logFile.close(); //Close file when ready
-	delay(10);
+	else{
+		//Initializing string starting with index i
+		//int ENOUGH = ((ceil(log10(i))+1)*sizeof(char));
+		int ENOUGH = 10;//Assuming index never exceeds 10 
+		char index[ENOUGH];
+		delay(10);
+		sprintf(index,"%d",i);
+		delay(50);
+		//Taking time and adding that to string
+		char h[3];
+		sprintf(h,"%d",hour());
+		char min[3];
+		sprintf(min,"%d",minute());
+		char s[3];
+		sprintf(s,"%d",second());
+		char d[3];
+		sprintf(d,"%d",day());
+		char mon[3];
+		sprintf(mon,"%d",month());
+		char y[5];
+		sprintf(y,"%d",year());
+		//Performing measurement and adding result to string
+		char v[6];
+		sprintf(v,"%0.3f",measure_vin_n(100));
+		//TODO:Writing string to logfile
+		char log_i[40];
+		strcpy(log_i,index);
+		strcat(log_i,",");
+		strcat(log_i,h);
+		strcat(log_i,":");
+		strcat(log_i,min);
+		strcat(log_i,":");
+		strcat(log_i,s);
+		strcat(log_i,",");
+		strcat(log_i,d);
+		strcat(log_i,"/");
+		strcat(log_i,mon);
+		strcat(log_i,"/");
+		strcat(log_i,y);
+		strcat(log_i,",");
+		strcat(log_i,v);
+		delay(10);
+		Serial.println(log_i);
+		delay(100);
+		logFile.println(log_i); //Write string + newline to logfile
+		delay(10);
+		logFile.close(); //Close file when ready
+		delay(10);
+	}
 }
