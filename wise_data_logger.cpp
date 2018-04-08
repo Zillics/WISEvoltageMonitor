@@ -20,7 +20,7 @@ char mem_filename[MAX_LENGTH];
 int mem_logInterval;
 int mem_logTime;
 File mem_logfile;
-
+Adafruit_TSL2561_Unified tsl = Adafruit_TSL2561_Unified(TSL2561_ADDR, 12345);
 //***********HARDWARE FUNCTIONS*************
 
 //Initialize correct settings for hardware 
@@ -29,6 +29,8 @@ void logger_init(){
   analogReadResolution(13);
   //Pin initialization
   pinMode(ain_pin,INPUT);
+  //Light sensor initialization
+  tsl2561_init();
 }
 
 //Estimate real voltage value of between input - and input +
@@ -61,9 +63,84 @@ double measure_vout_n(int n){
 	double mean = sum/(double)n;
 	return mean;
 }
+//Initializes light sensor tsl2561
+void tsl2561_init(){
+	delay(200);
+	/* Initialise the sensor */
+	//use tsl.begin() to default to Wire, 
+	//tsl.begin(&Wire2) directs api to use Wire2, etc.
+	if(!tsl.begin())
+	{
+		/* There was a problem detecting the TSL2561 ... check your connections */
+		Serial.print("Ooops, no TSL2561 detected ... Check your wiring or I2C ADDR!");
+		while(1);
+  }
+  
+  /* Display some basic information on this sensor */
+tsl2561_displaySensorDetails();
+  
+  /* Setup the sensor gain and integration time */
+tsl2561_configure();
+  
+  /* We're ready to go! */
+Serial.println("");
+} 
+//Configures the light sensor tsl2561
+void tsl2561_configure(){
+	/* You can also manually set the gain or enable auto-gain support */
+	// tsl.setGain(TSL2561_GAIN_1X);      /* No gain ... use in bright light to avoid sensor saturation */
+	// tsl.setGain(TSL2561_GAIN_16X);     /* 16x gain ... use in low light to boost sensitivity */
+	tsl.enableAutoRange(true);            /* Auto-gain ... switches automatically between 1x and 16x */
+
+	/* Changing the integration time gives you better sensor resolution (402ms = 16-bit data) */
+	//tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_13MS);      /* fast but low resolution */
+	// tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_101MS);  /* medium resolution and speed   */
+	tsl.setIntegrationTime(TSL2561_INTEGRATIONTIME_402MS);  /* 16-bit data but slowest conversions */
+
+	/* Update these values depending on what you've set above! */  
+	Serial.println("------------------------------------");
+	Serial.print  ("Gain:         "); Serial.println("Auto");
+	Serial.print  ("Timing:       "); Serial.println("13 ms");
+	Serial.println("------------------------------------");
+}
+void tsl2561_displaySensorDetails(void)
+{
+	sensor_t sensor;
+	tsl.getSensor(&sensor);
+	Serial.println("------------------------------------");
+	Serial.print  ("Sensor:       "); Serial.println(sensor.name);
+	Serial.print  ("Driver Ver:   "); Serial.println(sensor.version);
+	Serial.print  ("Unique ID:    "); Serial.println(sensor.sensor_id);
+	Serial.print  ("Max Value:    "); Serial.print(sensor.max_value); Serial.println(" lux");
+	Serial.print  ("Min Value:    "); Serial.print(sensor.min_value); Serial.println(" lux");
+	Serial.print  ("Resolution:   "); Serial.print(sensor.resolution); Serial.println(" lux");  
+	Serial.println("------------------------------------");
+	Serial.println("");
+	delay(500);
+}
+//Measure lux value from tsl2561 sensor through i2c
+uint32_t measure_lux(){
+	/* Get a new sensor event */ 
+	sensors_event_t event;
+	tsl.getEvent(&event);
+
+	/* Display the results (light is measured in lux) */
+	if (event.light)
+	{
+		//Serial.print(event.light); Serial.println(" lux");
+		return(TSL2561_CAL_A*event.light + TSL2561_CAL_B);
+	}
+	else
+	{
+	/* If event.light = 0 lux the sensor is probably saturated
+	   and no reliable data could be generated! */
+		Serial.println("Sensor overload");
+		return(0);
+	}
+}
+
 
 //***********INTERFACE FUNCTIONS*************
-
 
 void serial_interface(){
 	//Initialize settings
@@ -168,33 +245,6 @@ void ask_time(){
 	int year = 2018;
 	setTime(hour, minute,second, day, month, year);
 }
-//SUDDENLY STOPPED WORKING.... Don't use
-int askInt(char* str){
-	int input;
-	Serial.print(str);
-	input = Serial.parseInt();
-	Serial.println(input);
-	Serial.flush();
-	return input; 
-}
-//SUDDENLY STOPPED WORKING....Don't use
-int yes_or_not(){
-	int usr_input = 0;
-	while(true){
-		Serial.println(F("Do you want to continue? (y/n)"));
-		while(Serial.available() == 0){} //Wait until user input
-		usr_input = Serial.read(); //Stores user input (one letter)
-		Serial.read(); //Clean Serial buffer from ENTER
-		Serial.println(char(usr_input));
-		switch(usr_input){
-			case 'y' : return 1;
-			case 'Y' : return 1;
-			case 'n' : return 0;
-			case 'N' : return 0;
-			default : Serial.println(F("Try again!"));
-		}
-	}
-}
 
 //***********LOGGING FUNCTIONS*************
 
@@ -241,7 +291,7 @@ void writeData(int i){
 	File logFile = SD.open(mem_filename, FILE_WRITE);//Open file. FILE_WRITE starts writing at end of file
 	delay(100);
 	if (!logFile) {
-		Serial.print(F("Error opening file"));
+		Serial.print(F("Error opening file "));
 		Serial.println(mem_filename);
 	}
 	else{
@@ -268,8 +318,9 @@ void writeData(int i){
 		//Performing measurement and adding result to string
 		char v[6];
 		sprintf(v,"%0.3f",measure_vin_n(100));
-		//TODO:Writing string to logfile
-		char log_i[40];
+		char l[6];
+		sprintf(l,"%ld",measure_lux());
+		char log_i[46];
 		strcpy(log_i,index);
 		strcat(log_i,",");
 		strcat(log_i,h);
@@ -285,6 +336,8 @@ void writeData(int i){
 		strcat(log_i,y);
 		strcat(log_i,",");
 		strcat(log_i,v);
+		strcat(log_i,",");
+		strcat(log_i, l);
 		delay(10);
 		Serial.println(log_i);
 		delay(100);
