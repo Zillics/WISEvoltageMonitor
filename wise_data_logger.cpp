@@ -187,7 +187,7 @@ unsigned long ask_logging_params(){
 	Serial.read();
 	size_t name_len = Serial.readBytesUntil(10,mem_filename,50); //terminates with newline (ASCII: 10)
 	Serial.println(mem_filename);
-	Serial.print(F("Enter logging interval in seconds: "));
+	Serial.print(F("Enter logging interval in milliseconds: "));
 	while(Serial.available() == 0){} //Wait until user input
 	mem_logInterval = Serial.parseInt(); //Store user input
 	delay(100);
@@ -218,10 +218,10 @@ unsigned long ask_logging_params(){
 	Serial.print(minutes);
 	Serial.print(F(" minutes. Logging interval: "));
 	Serial.print(mem_logInterval);
-	Serial.println(F(" seconds."));
+	Serial.println(F(" milliseconds."));
 	delay(100);
 		//CALCULATING TOTAL NUMBER OF MEASUREMENTS BASED ON USER INPUT
-	unsigned long n = (60*60*24*days)/mem_logInterval + (60*60*hours)/mem_logInterval + (minutes*60)/mem_logInterval;
+	unsigned long n = (60*60*24*days*1000)/mem_logInterval + (60*60*hours*1000)/(mem_logInterval) + (minutes*60*1000)/(mem_logInterval);
 	Serial.println(n);
 
 	return n;
@@ -265,7 +265,7 @@ void init_logging(){
 		delay(100);
 		if(n > 0){
 			Serial.println(F("STARTING LOGGING....."));
-			delay(100);
+			delay(1);
 			logging(mem_logInterval, n);
 			Serial.println(F("LOGGING ENDED"));
 		}
@@ -280,16 +280,16 @@ void logging(int interval,unsigned long n){
 	for(int i = 0;i < n; i++){
 		writeData(i);
 		//logfile.println(measData);
-		delay(1000*interval);
+		delay(interval); //-8 because 8 delay(8) in writeData function
 	}
 }
 
 //Creates a string for the measuring status in the following form;
 //"[Number of measurement],[Date and time of measurement], [Measurement value in V]"
 void writeData(int i){
-	delay(100);
+	delay(1);
 	File logFile = SD.open(mem_filename, FILE_WRITE);//Open file. FILE_WRITE starts writing at end of file
-	delay(100);
+	delay(1);
 	if (!logFile) {
 		Serial.print(F("Error opening file "));
 		Serial.println(mem_filename);
@@ -299,9 +299,9 @@ void writeData(int i){
 		//int ENOUGH = ((ceil(log10(i))+1)*sizeof(char));
 		int ENOUGH = 10;//Assuming index never exceeds 10 
 		char index[ENOUGH];
-		delay(10);
+		delay(1);
 		sprintf(index,"%d",i);
-		delay(50);
+		delay(1);
 		//Taking time and adding that to string
 		char h[3];
 		sprintf(h,"%d",hour());
@@ -309,6 +309,8 @@ void writeData(int i){
 		sprintf(min,"%d",minute());
 		char s[3];
 		sprintf(s,"%d",second());
+		char ms[10];
+		sprintf(ms,"%d",millis());
 		char d[3];
 		sprintf(d,"%d",day());
 		char mon[3];
@@ -320,7 +322,7 @@ void writeData(int i){
 		sprintf(v,"%0.3f",measure_vin_n(100));
 		char l[6];
 		sprintf(l,"%ld",measure_lux());
-		char log_i[46];
+		char log_i[56];
 		strcpy(log_i,index);
 		strcat(log_i,",");
 		strcat(log_i,h);
@@ -328,6 +330,8 @@ void writeData(int i){
 		strcat(log_i,min);
 		strcat(log_i,":");
 		strcat(log_i,s);
+		strcat(log_i,",");
+		strcat(log_i,ms);
 		strcat(log_i,",");
 		strcat(log_i,d);
 		strcat(log_i,"/");
@@ -338,12 +342,12 @@ void writeData(int i){
 		strcat(log_i,v);
 		strcat(log_i,",");
 		strcat(log_i, l);
-		delay(10);
+		delay(1);
 		Serial.println(log_i);
-		delay(100);
+		delay(1);
 		logFile.println(log_i); //Write string + newline to logfile
-		delay(10);
+		delay(1);
 		logFile.close(); //Close file when ready
-		delay(10);
+		delay(1);
 	}
 }

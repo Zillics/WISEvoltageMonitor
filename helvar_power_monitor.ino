@@ -19,6 +19,6 @@ uint32_t l = 0;
 void loop() {
 serial_interface();
 //Serial.println(measure_lux());
-//delay(200);
+delay(200);
 }
 

@@ -40,8 +40,8 @@ extern File mem_logfile;
 extern Adafruit_TSL2561_Unified tsl;
 //Calibration parameters (initialized as A = 1, B = 0)
 //Calibration format: lux = A*l + B
-#define TSL2561_CAL_A 1
-#define TSL2561_CAL_B 0
+#define TSL2561_CAL_A 1.067
+#define TSL2561_CAL_B 10.11
 
 
 //HARDWARE FUNCTIONS
